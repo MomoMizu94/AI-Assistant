@@ -13,7 +13,7 @@ PIPE_PATH = "/tmp/ai-assistant.pipe"
 SAMPLE_RATE = 48000
 CHANNELS = 1
 RECORD_TIMEOUT = 0.5
-LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-Coder-V2-Lite-Instruct-Q6_K.gguf -t 6 -ngl 999 -p"
+LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-Coder-V2-Lite-Instruct-Q6_K.gguf -t 6 -ngl 999 --single-turn -p"
 TTS_COMMAND = ["festival", "--tts"]
 
 # Setup
@@ -36,6 +36,9 @@ def record_audio():
     with sounddevice.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=audio_callback):
         while True:
             time.sleep(RECORD_TIMEOUT)
+
+def text_to_speech(text):
+    run(TTS_COMMAND, input=text, text=True)
 
 
 def process_audio():
@@ -65,7 +68,7 @@ def process_audio():
     # Sends the question to local LLM and captures the output
     print(">> Querying local LLM...")
     prompt = f"<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant"
-    result = run(f'{LLM_COMMAND} "{prompt}"', shell=True, capture_output = True, text = True, timeout = 20)
+    result = run(f'{LLM_COMMAND} "{prompt}"', shell=True, capture_output = True, text = True, timeout = 30)
     print(">> RAW OUTPUT:\n", result.stdout)
 
 
@@ -78,15 +81,24 @@ def process_audio():
     print(">> Raw LLM output:")
     print(result.stdout)
 
+    # Capture everything after the assistant tag ?? Not working??
+    start_marker = "<|im_start|>assistant"
+    response = result.stdout.split(start_marker, 1)[-1].strip()
 
-    # Strip out empty lines and extract the last meaningful one
-    lines = [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
-    response = lines[-1] if lines else "[No meaningful output]"
+    # Remove trailing or '[end of text]'
+    response = response.removesuffix("[end of text]").strip()
+
+    # Remove "Assistant:" prefix
+    if response.lower().startswith("assistant:"):
+        response = response[len("assistant:"):].strip()
+
+    # Remove asterisks
+    response = response.replace("*", "")
 
     print(">> RESPONSE:", response)
 
     # Feeds the response to TTS
-    run(TTS_COMMAND + [response])
+    text_to_speech(response)
 
 
 # Waits for a command and toggles the record state. Sends the recorded audio further.
