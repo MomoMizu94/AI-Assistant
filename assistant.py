@@ -101,22 +101,22 @@ def process_audio():
     text_to_speech(response)
 
 
-# Waits for a command and toggles the record state. Sends the recorded audio further.
+# Waits for a command and toggles the record state. Sends the recorded audio to processing.
 def pipe_listener():
     global record
 
     print(f"Listening for dwm triggers on {PIPE_PATH}...")
+
     while True:
         with open(PIPE_PATH, 'r') as pipe:
-            for line in pipe:
-                cmd = line.strip()
-                if cmd == "toggle":
-                    record = not record
-                    if record:
-                        print("Recording started...")
-                    else:
-                        print("Recording stopped...")
-                        process_audio()
+            cmd = pipe.read().strip()
+            if cmd == "toggle":
+                record = not record
+                if record:
+                    print("Recording started...")
+                else:
+                    print("Recording stopped...")
+                    process_audio()
 
 
 # Listens for a keybind and continuously records mic audio
