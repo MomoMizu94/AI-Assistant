@@ -4,9 +4,10 @@ import time
 import queue
 import sounddevice
 import numpy
-from subprocess import run
+from subprocess import run, DEVNULL
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as write_wav
+from piper import PiperVoice
 
 ### Configurations ###
 # Pipe triggers the script via dwm keybind
@@ -14,12 +15,15 @@ PIPE_PATH = "/tmp/ai-assistant.pipe"
 
 # Audio tuning
 SAMPLE_RATE = 48000
+PIPER_SAMPLE_RATE = 22050
 CHANNELS = 1
 RECORD_TIMEOUT = 1.0
 
 # Commands for locally run LLM and TTS
 LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-Coder-V2-Lite-Instruct-Q6_K.gguf -t 6 -ngl 999 --single-turn -p"
-TTS_COMMAND = ["festival", "--tts"]
+PIPER_MODEL = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-libritts_r-medium.onnx"
+PIPER_CONFIG = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-libritts_r-medium.onnx.json"
+PIPER_VOICE = PiperVoice.load(PIPER_MODEL, config_path=PIPER_CONFIG)
 
 ### Initialization ###
 # Ensure clean state for the pipe
@@ -52,14 +56,30 @@ def record_audio():
 
 ### TTS function ###
 def text_to_speech(text):
-    # Sends the response to TTS of choice (Festival)
-    run(TTS_COMMAND, input=text, text=True)
+    print(">> Generating speech...")
+
+    # Generate audio chunks from provided response text
+    audio_chunks = list(PIPER_VOICE.synthesize(text))
+    # Extract audio arrays
+    audio_array = [chunk.audio_int16_array for chunk in audio_chunks]
+    # Form one numpy array
+    audio = numpy.concatenate(audio_array)
+    
+    # Write the audio data to a wav file with sample rate from Piper model settings
+    wav_path = "response.wav"
+    write_wav(wav_path, PIPER_SAMPLE_RATE, audio)
+
+    # Play generated audio file with ffplay
+    run(["ffplay", "-nodisp", "-autoexit", wav_path], stdout=DEVNULL, stderr=DEVNULL)
+
+    # Clean upfor temp files
+    if os.path.exists(wav_path):
+        os.remove(wav_path)
 
 
 ### Audio processing function ###
 def process_audio():
     # Processes recorded audio by transcribing it, sending it to LLM, and speaking out the response
-    global record
     print(">> Starting audio processing...")
 
     # Create an empty list and append audio chunks to it
@@ -102,6 +122,10 @@ def process_audio():
 
     response = response.replace("*", "")
     print(">> RESPONSE:", response)
+
+    # Clean upfor temp files
+    if os.path.exists(audio_path):
+        os.remove(audio_path)
 
     # Feeds the response to TTS
     text_to_speech(response)
