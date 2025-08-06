@@ -7,7 +7,7 @@ import numpy
 from subprocess import run, DEVNULL
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as write_wav
-from piper import PiperVoice
+from piper import PiperVoice, SynthesisConfig
 
 ### Configurations ###
 # Pipe triggers the script via dwm keybind
@@ -20,10 +20,11 @@ CHANNELS = 1
 RECORD_TIMEOUT = 1.0
 
 # Commands for locally run LLM and TTS
-LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-Coder-V2-Lite-Instruct-Q6_K.gguf -t 6 -ngl 999 --single-turn -p"
-PIPER_MODEL = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-libritts_r-medium.onnx"
-PIPER_CONFIG = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-libritts_r-medium.onnx.json"
+LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-V2-Lite-Chat-Q6_K.gguf -t 8 -ngl 999 --single-turn -p"
+PIPER_MODEL = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx"
+PIPER_CONFIG = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx.json"
 PIPER_VOICE = PiperVoice.load(PIPER_MODEL, config_path=PIPER_CONFIG)
+SYNTH_CONFIG = SynthesisConfig(length_scale=0.80)
 
 ### Initialization ###
 # Ensure clean state for the pipe
@@ -59,7 +60,7 @@ def text_to_speech(text):
     print(">> Generating speech...")
 
     # Generate audio chunks from provided response text
-    audio_chunks = list(PIPER_VOICE.synthesize(text))
+    audio_chunks = list(PIPER_VOICE.synthesize(text, syn_config=SYNTH_CONFIG))
     # Extract audio arrays
     audio_array = [chunk.audio_int16_array for chunk in audio_chunks]
     # Form one numpy array
@@ -104,7 +105,7 @@ def process_audio():
 
     # Sends the question to LLM and captures the output
     print(">> Querying local LLM...")
-    prompt = f"<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant"
+    prompt = f"<|begin_of_sentence|>You are a no-nonsense but friendly assistant that gives short, accurate answers.\n\nUser: {text}\n\nAssistant:"
     result = run(f'{LLM_COMMAND} "{prompt}"', shell=True, capture_output = True, text = True, timeout = 30)
 
     # Defensive fallback
@@ -113,14 +114,14 @@ def process_audio():
         return
 
     # Extract the response
-    start_marker = "<|im_start|>assistant"
+    start_marker = "Assistant:"
     response = result.stdout.split(start_marker, 1)[-1].strip()
     response = response.removesuffix("[end of text]").strip()
 
     if response.lower().startswith("assistant:"):
         response = response[len("assistant:"):].strip()
 
-    response = response.replace("*", "")
+    response = response.replace("*", "").strip()
     print(">> RESPONSE:", response)
 
     # Clean upfor temp files
