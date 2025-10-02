@@ -2,8 +2,8 @@ import os
 import threading
 import time
 import queue
-import sounddevice
 import numpy
+import sounddevice
 from subprocess import run, DEVNULL
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as write_wav
@@ -37,7 +37,7 @@ record = False
 # Holds recorded audio chunks
 audio_queue = queue.Queue()
 # Speech recognition model
-model = WhisperModel("base.en", compute_type="float32")
+model = WhisperModel("base.en", device="cpu", compute_type="int8")
 
 
 ### Audio callback ###
