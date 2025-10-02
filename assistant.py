@@ -20,7 +20,7 @@ CHANNELS = 1
 RECORD_TIMEOUT = 1.0
 
 # Commands for locally run LLM and TTS
-LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/DeepSeek-V2-Lite-Chat-Q6_K.gguf -t 8 -ngl 999 --single-turn -p"
+LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/deepseek-v2-lite-chat-q8_0.gguf -t 8 -ngl 999 --single-turn -p"
 PIPER_MODEL = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx"
 PIPER_CONFIG = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx.json"
 PIPER_VOICE = PiperVoice.load(PIPER_MODEL, config_path=PIPER_CONFIG)
