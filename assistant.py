@@ -1,17 +1,14 @@
-import os
-import threading
-import time
-import queue
-import numpy
-import sounddevice
+import os, threading, time, queue, numpy, sounddevice, requests
 from subprocess import run, DEVNULL
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as write_wav
 from piper import PiperVoice, SynthesisConfig
 
-### Configurations ###
-# Pipe triggers the script via dwm keybind
+
+### CONFIGURATIONS ###
 PIPE_PATH = "/tmp/ai-assistant.pipe"
+SERVER_URL = "http://127.0.0.1:8080/v1/chat/completions"
+MODEL_NAME = "Qwen3-32B-UD-Q6_K_XL.gguf"
 
 # Audio tuning
 SAMPLE_RATE = 48000
@@ -19,14 +16,14 @@ PIPER_SAMPLE_RATE = 22050
 CHANNELS = 1
 RECORD_TIMEOUT = 1.0
 
-# Commands for locally run LLM and TTS
-LLM_COMMAND = "/home/momo/Documents/GitHub/llama.cpp/build/bin/llama-cli -m /home/momo/Documents/GitHub/llama.cpp/models/deepseek-v2-lite-chat-q8_0.gguf -t 8 -ngl 999 --single-turn -p"
-PIPER_MODEL = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx"
-PIPER_CONFIG = "/home/momo/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx.json"
+# TTS
+PIPER_MODEL = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx")
+PIPER_CONFIG = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en_US-sam-medium.onnx.json")
 PIPER_VOICE = PiperVoice.load(PIPER_MODEL, config_path=PIPER_CONFIG)
 SYNTH_CONFIG = SynthesisConfig(length_scale=0.80)
 
-### Initialization ###
+
+### INITIALIZATION ###
 # Ensure clean state for the pipe
 if os.path.exists(PIPE_PATH):
     os.remove(PIPE_PATH)
@@ -40,14 +37,14 @@ audio_queue = queue.Queue()
 model = WhisperModel("base.en", device="cpu", compute_type="int8")
 
 
-### Audio callback ###
+### AUDIO CALLBACK ###
 def audio_callback(indata, frames, time_info, status):
     # Places audio chunks into a queue while recording
     if record:
         audio_queue.put(indata.copy())
 
 
-### Audio record loop ###
+### AUDIO RECORD LOOP ###
 def record_audio():
     # Opens audio stream and starts calling for audio_callback in another thread
     with sounddevice.InputStream(samplerate=SAMPLE_RATE, channels=CHANNELS, callback=audio_callback):
@@ -55,7 +52,7 @@ def record_audio():
             time.sleep(RECORD_TIMEOUT)
 
 
-### TTS function ###
+### TTS FUNCTION ###
 def text_to_speech(text):
     print(">> Generating speech...")
 
@@ -78,7 +75,36 @@ def text_to_speech(text):
         os.remove(wav_path)
 
 
-### Audio processing function ###
+### QUERY LLM VIA HTTP ###
+def llm_query(prompt):
+    try:
+        # Dictionary layout for data
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {"role": "system", "content": "You are a concise and friendly AI assistant that gives short, accurate answers."},
+                {"role": "user", "content": prompt.strip()}
+            ],
+            # Randomness control (deterministic --- creative)
+            "temperature": 0.7
+        }
+        print(">> Sending a query to LLM server...")
+        # Request sending
+        response = requests.post(SERVER_URL, json=payload, timeout=120)
+        # Checks for http errors
+        response.raise_for_status()
+        # Parses response JSON to python dictionary
+        data = response.json()
+        # Extracts generated text from JSON structure
+        content = data["choices"][0]["message"]["content"]
+        # Returns the response text further
+        return content.strip()
+    except Exception as e:
+        print(f">> LLM request failed due to: {e}")
+        return "Error encountered while processing request."
+
+
+### AUDIO PROCESSING ###
 def process_audio():
     # Processes recorded audio by transcribing it, sending it to LLM, and speaking out the response
     print(">> Starting audio processing...")
@@ -93,7 +119,7 @@ def process_audio():
         print("No audio captured.")
         return
 
-    # Joins all audio chunks into a .wav file
+    # Joins all audio chunks into a temporary .wav file
     audio = numpy.concatenate(frames, axis=0)
     audio_path = "temp_audio.wav"
     write_wav(audio_path, SAMPLE_RATE, audio)
@@ -103,36 +129,25 @@ def process_audio():
     text = " ".join([seg.text for seg in segments])
     print(">> TRANSCRIPT:", text)
 
-    # Sends the question to LLM and captures the output
-    print(">> Querying local LLM...")
-    prompt = f"<|begin_of_sentence|>You are a no-nonsense but friendly assistant that gives short, accurate answers.\n\nUser: {text}\n\nAssistant:"
-    result = run(f'{LLM_COMMAND} "{prompt}"', shell=True, capture_output = True, text = True, timeout = 30)
-
-    # Defensive fallback
-    if result.returncode != 0:
-        print("LLM command failed:", result.stderr)
-        return
-
-    # Extract the response
-    start_marker = "Assistant:"
-    response = result.stdout.split(start_marker, 1)[-1].strip()
-    response = response.removesuffix("[end of text]").strip()
-
-    if response.lower().startswith("assistant:"):
-        response = response[len("assistant:"):].strip()
-
-    response = response.replace("*", "").strip()
-    print(">> RESPONSE:", response)
-
     # Clean upfor temp files
     if os.path.exists(audio_path):
         os.remove(audio_path)
+    
+    # Send the question to LLM and get its reply
+    response = llm_query(text).strip()
+
+    # Split the response after first </think> block & remove asterisks
+    if "<think>" in response and "</think>" in response:
+        response = response.split("</think>", 1)[-1].strip()
+    response = response.replace("*", "").strip()
+
+    print(">> RESPONSE:", response)
 
     # Feeds the response to TTS
     text_to_speech(response)
 
 
-### Pipe listener ###
+### PIPE LISTENER ### 
 def pipe_listener():
     # Listens for 'toggle' command on the pipe and updates recording state accordingly
     global record
@@ -162,11 +177,12 @@ def pipe_listener():
             time.sleep(0.5)
 
 
-### Main ###
+### MAIN ###
 if __name__ == "__main__":
-    # Prints initial record state, for debugging
+    # For debugging
     print(f"Startup: record state = {record}")
-    # Background threads
+
+    # Background threads for pipe and audio recording
     threading.Thread(target=pipe_listener, daemon=True).start()
     threading.Thread(target=record_audio, daemon=True).start()
 
@@ -175,4 +191,4 @@ if __name__ == "__main__":
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("Shutting down...")
+        print("\nShutting down...")
