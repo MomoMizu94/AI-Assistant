@@ -1,5 +1,4 @@
-import os, threading, time, queue, numpy, sounddevice, requests
-from subprocess import run, DEVNULL
+import os, threading, time, queue, numpy, sounddevice, requests, signal, subprocess, json
 from faster_whisper import WhisperModel
 from scipy.io.wavfile import write as write_wav
 from piper import PiperVoice, SynthesisConfig
@@ -7,8 +6,14 @@ from piper import PiperVoice, SynthesisConfig
 
 ### CONFIGURATIONS ###
 PIPE_PATH = "/tmp/ai-assistant.pipe"
-SERVER_URL = "http://127.0.0.1:8080/v1/chat/completions"
 MODEL_NAME = "Qwen3-32B-UD-Q6_K_XL.gguf"
+LLM_SERVER_BIN = os.path.expanduser("~/Documents/GitHub/llama.cpp/build/bin/llama-server")
+LLM_MODEL_PATH = os.path.expanduser("~/Documents/GitHub/llama.cpp/models/Qwen3-32B-UD-Q6_K_XL.gguf")
+SERVER_PORT = 8080
+SERVER_PID_FILE = "/tmp/llm_server.pid"
+AUTO_SHUTDOWN = 600
+CHAT_HISTORY_FILE = "/tmp/assistant_history.json"
+last_query_time = time.time()
 
 # Audio tuning
 SAMPLE_RATE = 48000
@@ -33,8 +38,99 @@ os.mkfifo(PIPE_PATH)
 record = False
 # Holds recorded audio chunks
 audio_queue = queue.Queue()
+# Load conversation history from the file
+if os.path.exists(CHAT_HISTORY_FILE):
+    with open(CHAT_HISTORY_FILE) as f:
+        conversation_history = json.load(f)
+else:
+    conversation_history = [
+        {"role": "system", "content": "You are a concise and friendly AI assistant that gives short, accurate answers without emojis."}
+    ]
 # Speech recognition model
 model = WhisperModel("base.en", device="cpu", compute_type="int8")
+
+### SERVER LISTENER ###
+def server_listener():
+    if not os.path.exists(SERVER_PID_FILE):
+        return False
+    # Checks if the server is still running on the background
+    try:
+        with open(SERVER_PID_FILE) as f:
+            pid = int(f.read().strip())
+            os.kill(pid, 0)
+            return True
+    except:
+        return False
+
+
+### START THE SERVER ###
+def start_server():
+    if server_listener():
+        return
+
+    # Start the LLM server as a bg process
+    print(">> LLM server starting. Loading model to VRAM...")
+    process = subprocess.Popen([
+        LLM_SERVER_BIN,
+        "-m", LLM_MODEL_PATH,
+        "-t", "16",
+        "-ngl", "999",
+        "--port", str(SERVER_PORT)
+    ])
+
+    # Bookmarks the bg process
+    with open(SERVER_PID_FILE, "w") as f:
+        f.write(str(process.pid))
+    time.sleep(2)
+    print(">> LLM server started with PID:", process.pid)
+
+    # Wait for the model to load
+    for _ in range(60):
+        try:
+            r = requests.get(f"http://127.0.0.1:{SERVER_PORT}/health", timeout=2)
+            if r.status_code == 200:
+                print(">> LLM server ready to accept queries.")
+                break
+        except Exception:
+            pass
+        time.sleep(1)
+    else:
+        print(">> LLM server did not respond within 60 seconds.")
+
+
+### STOP THE SERVER ###
+def stop_server():
+    global conversation_history
+    # Clear conversation history only is server is manually stopped
+    conversation_history = conversation_history[:1]
+    with open(CHAT_HISTORY_FILE, "w") as f:
+        json.dump(conversation_history, f)
+    print(">> Conversation history cleared.")
+    
+    if not server_listener():
+        print(">> No LLM server running.")
+        return
+    try:
+        with open(SERVER_PID_FILE) as f:
+            pid = int(f.read().strip())
+        print(f">> Stopping LLM server with PID: {pid}")
+        os.kill(pid, signal.SIGTERM)
+        os.remove(SERVER_PID_FILE)
+        print(">> LLM server stopped. Reserved VRAM released.")
+        # Potential clear conversation memory here?
+    
+    except Exception as e:
+        print(f">> Failed to stop LLM server: {e}")
+
+
+### AUTO SHUTDOWN ###
+def auto_shutdown_monitor():
+    global last_query_time
+    while True:
+        if server_listener() and (time.time() - last_query_time > AUTO_SHUTDOWN):
+            print(">> LLM has been idle for 10 minutes. Shutting down the server...")
+            stop_server()
+        time.sleep(60)
 
 
 ### AUDIO CALLBACK ###
@@ -68,7 +164,7 @@ def text_to_speech(text):
     write_wav(wav_path, PIPER_SAMPLE_RATE, audio)
 
     # Play generated audio file with ffplay
-    run(["ffplay", "-nodisp", "-autoexit", wav_path], stdout=DEVNULL, stderr=DEVNULL)
+    subprocess.run(["ffplay", "-nodisp", "-autoexit", wav_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     # Clean upfor temp files
     if os.path.exists(wav_path):
@@ -77,26 +173,40 @@ def text_to_speech(text):
 
 ### QUERY LLM VIA HTTP ###
 def llm_query(prompt):
+    global last_query_time, conversation_history
+
+    # Start the server if it's not running
+    if not server_listener():
+        start_server()
+    
+    last_query_time = time.time()
+
+    # Add message to memory
+    conversation_history.append({"role": "user", "content": prompt.strip()})
+
+    # Dictionary layout for data
+    payload = {
+        "model": MODEL_NAME,
+        "messages": conversation_history,
+        # Randomness control (deterministic --- creative)
+        "temperature": 0.7
+    }
+
     try:
-        # Dictionary layout for data
-        payload = {
-            "model": MODEL_NAME,
-            "messages": [
-                {"role": "system", "content": "You are a concise and friendly AI assistant that gives short, accurate answers."},
-                {"role": "user", "content": prompt.strip()}
-            ],
-            # Randomness control (deterministic --- creative)
-            "temperature": 0.7
-        }
+        
         print(">> Sending a query to LLM server...")
         # Request sending
-        response = requests.post(SERVER_URL, json=payload, timeout=120)
+        response = requests.post(f"http://127.0.0.1:{SERVER_PORT}/v1/chat/completions", json=payload, timeout=120)
         # Checks for http errors
         response.raise_for_status()
         # Parses response JSON to python dictionary
         data = response.json()
         # Extracts generated text from JSON structure
         content = data["choices"][0]["message"]["content"]
+        # Add to history
+        conversation_history.append({"role": "assistant", "content": content.strip()})
+        with open(CHAT_HISTORY_FILE, "w") as f:
+            json.dump(conversation_history, f)
         # Returns the response text further
         return content.strip()
     except Exception as e:
@@ -164,14 +274,23 @@ def pipe_listener():
                         continue
 
                     print(f"Received command from pipe: '{cmd}'")
-                    print(f"TOGGLE received. Previous state: {record}")
-                    record = not record
-                    print(f"New recording state: {record}")
-                    if record:
-                        print("Recording started...")
+                    if cmd == "toggle":
+                        print(f"TOGGLE received. Previous state: {record}")
+                        record = not record
+                        print(f"New recording state: {record}")
+                        if record:
+                            print("Recording started...")
+                        else:
+                            print("Recording stopped...")
+                            process_audio()
+
+                    elif cmd == "stop":
+                        print("Received STOP command. Shutting down the LLM server manually...")
+                        stop_server()
+
                     else:
-                        print("Recording stopped...")
-                        process_audio()
+                        print(f"Unknown command: {cmd}")
+
         except Exception as e:
             print(f"Pipe error: {e}")
             time.sleep(0.5)
@@ -181,6 +300,10 @@ def pipe_listener():
 if __name__ == "__main__":
     # For debugging
     print(f"Startup: record state = {record}")
+
+    # Background thread for automatic shutdown
+    threading.Thread(target=auto_shutdown_monitor, daemon=True).start()
+
 
     # Background threads for pipe and audio recording
     threading.Thread(target=pipe_listener, daemon=True).start()
