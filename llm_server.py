@@ -1,4 +1,4 @@
-import time, os, subprocess
+import time, os, subprocess, signal, requests
 
 class LLMServerManager:
     def __init__(self, bin_path, model_path, port, pid_file, auto_shutdown):
@@ -50,6 +50,7 @@ class LLMServerManager:
         # Wait for the model finish loading
         for _ in range(60):
             try:
+                # Remove prints?
                 r = requests.get(f"http://127.0.0.1:{self.port}/health", timeout=2)
                 if r.status_code == 200:
                     print(">> LLM server ready to accept queries.")
@@ -62,7 +63,7 @@ class LLMServerManager:
 
 
     ### STOP THE SERVER ###
-    def stop(self):
+    def stop(self, conversation=None):
         # Stops LLM server and clears conversation history optionally
         if conversation:
             conversation.clear(keep_system=True)
