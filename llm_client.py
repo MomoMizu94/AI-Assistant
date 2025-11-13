@@ -1,7 +1,7 @@
 import time, requests
 
 class LLMClient():
-    def __init__(self, model_name, server, conversation, temperature=0.7):
+    def __init__(self, model_name, server, conversation, temperature):
         ''' Handles communication with the local LLM
 
         Args: model_name (str): model name used by llama.cpp
@@ -71,5 +71,7 @@ class LLMClient():
         text = text.replace("*", "").strip()
         # Clean hashtags
         text = text.replace("###", "").strip()
+        # Remove horizontal dash lines
+        text = text.replace("---", "").strip()
 
         return text

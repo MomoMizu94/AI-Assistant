@@ -8,13 +8,11 @@ AUTO_SHUTDOWN = 600
 CHAT_HISTORY_FILE = "/tmp/assistant_history.json"
 
 ### AUDIO SETTINGS ###
-WHISPER_MODEL = "base.en"
+WHISPER_MODEL = "large-v3"
 SAMPLE_RATE = 48000
 PIPER_SAMPLE_RATE = 22050
 CHANNELS = 1
 RECORD_TIMEOUT = 1.0
-
-### TTS SETTIGNS ###
 PIPER_MODEL = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en_US-alexa-medium/alexa.onnx")
 PIPER_CONFIG = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en_US-alexa-medium/alexa.onnx.json")
 
@@ -22,3 +20,4 @@ PIPER_CONFIG = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en
 LLM_SERVER_BIN = os.path.expanduser("~/Documents/GitHub/llama.cpp/build/bin/llama-server")
 LLM_MODEL_PATH = os.path.expanduser("~/Documents/GitHub/llama.cpp/models/Qwen3-32B-UD-Q6_K_XL.gguf")
 LLM_PID_FILE = "/tmp/llm_server.pid"
+TEMPERATURE = 0.7

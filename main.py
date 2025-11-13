@@ -18,7 +18,7 @@ server = LLMServerManager(
     auto_shutdown=AUTO_SHUTDOWN
 )
 
-llm_client = LLMClient(MODEL_NAME, server, conversation)
+llm_client = LLMClient(MODEL_NAME, server, conversation, TEMPERATURE)
 
 audio_manager = AudioManager(
     whisper_model = WHISPER_MODEL,

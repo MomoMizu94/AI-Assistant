@@ -4,8 +4,8 @@ from scipy.io.wavfile import write as write_wav
 from piper import PiperVoice, SynthesisConfig
 
 class AudioManager:
-    def __init__(self,whisper_model="large-v3", piper_model=None, piper_config=None,
-                mic_rate=48000, tts_rate=22050, channels=1, record_timeout=1.0):
+    def __init__(self,whisper_model, piper_model, piper_config,
+                mic_rate, tts_rate, channels, record_timeout):
         # Recording setup
         self.mic_rate = mic_rate
         self.channels = channels
@@ -57,7 +57,7 @@ class AudioManager:
         write_wav(temp_path, self.mic_rate, audio)
 
         # Transcribe the audio
-        segments, _ = self.whisper.transcribe(temp_path)
+        segments, _ = self.whisper.transcribe(temp_path, language="en", task="transcribe")
         text = " ".join([seg.text for seg in segments])
 
         # Clean upfor temp files

@@ -1,7 +1,7 @@
 import os, time
 
 class PipeListener:
-    def __init__(self, pipe_path="/tmp/ai-assistant.pipe", on_toggle=None, on_stop=None):
+    def __init__(self, pipe_path, on_toggle=None, on_stop=None):
         self.pipe_path = pipe_path
         self.on_toggle = on_toggle
         self.on_stop = on_stop
