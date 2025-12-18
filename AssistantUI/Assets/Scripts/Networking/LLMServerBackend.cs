@@ -35,6 +35,17 @@ public class LLMServerBackend : MonoBehaviour
     }
 
 
+    public IEnumerator EnsureServerIsReady()
+    {
+        if (IsRunning == false)
+        {
+            StartServer();
+        }
+
+        yield return WaitForHealthThenLogReady();
+    }
+
+
     public void StartServerButton()
     {
         // Check if server is already running; if not, start it
@@ -104,7 +115,7 @@ public class LLMServerBackend : MonoBehaviour
     }
 
 
-    private IEnumerator WaitForHealthThenLogReady()
+    public IEnumerator WaitForHealthThenLogReady()
     {
         // Creates variables for time (not effected by pause) and server url
         float start = Time.realtimeSinceStartup;
@@ -113,6 +124,12 @@ public class LLMServerBackend : MonoBehaviour
         // Repeats until timeout
         while (Time.realtimeSinceStartup - start < healthTimeoutSeconds)
         {
+            if (IsRunning == false)
+            {
+                UnityEngine.Debug.LogError("LLM server process exited before becoming healthy.");
+                yield break;
+            }
+
             using (var req = UnityWebRequest.Get(serverUrl))
             {
                 // Timeout variable for single HTTP attempts
