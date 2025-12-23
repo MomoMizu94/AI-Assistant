@@ -98,8 +98,6 @@ public class ConversationBackend : MonoBehaviour
             temperature = temperature
         };
         string requestInJson = JsonUtility.ToJson(messageBody);
-        Debug.Log("REQUEST JSON:\n" + requestInJson);
-
 
         string backendUrl = $"http://127.0.0.1:{serverBackend.serverPort}/v1/chat/completions";
 
@@ -149,9 +147,6 @@ public class ConversationBackend : MonoBehaviour
                 responseContent = parsedResponse.choices[0].message.content;
             }
             string cleanedResponseContent = CleanResponse(responseContent);
-
-            Debug.Log("MOIMOIMOI");
-            Debug.Log(cleanedResponseContent);
 
             // Add response to chat history
             AppendMessage("assistant", cleanedResponseContent);
