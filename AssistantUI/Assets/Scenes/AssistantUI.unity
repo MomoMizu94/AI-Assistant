@@ -196,9 +196,15 @@ MonoBehaviour:
   m_GameObject: {fileID: 70438495}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3a455d192f09d1f91a432ca3377ffa6a, type: 3}
+  m_Script: {fileID: 11500000, guid: 209b728dfa47678ebadbc40ec928b60d, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::ChatUI
+  m_EditorClassIdentifier: Assembly-CSharp::ConversationBackend
+  serverBackend: {fileID: 1961140692}
+  modelName: Qwen3-32B-UD-Q6_K_XL.gguf
+  temperature: 0.7
+  inputField: {fileID: 1147864686}
+  chatContent: {fileID: 336093156}
+  messagePrefab: {fileID: 5395458038931984856, guid: f3048a42e1ff13d9d97f2180302d0b68, type: 3}
 --- !u!1 &99030514
 GameObject:
   m_ObjectHideFlags: 0
@@ -1102,7 +1108,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls:
       - m_Target: {fileID: 70438497}
-        m_TargetAssemblyTypeName: ChatUI, Assembly-CSharp
+        m_TargetAssemblyTypeName: ConversationBackend, Assembly-CSharp
         m_MethodName: OnSendButtonPressed
         m_Mode: 1
         m_Arguments:
@@ -3267,7 +3273,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1961140692}
         m_TargetAssemblyTypeName: LLMServerBackend, Assembly-CSharp
-        m_MethodName: StartServerFromButton
+        m_MethodName: StartServerButton
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}

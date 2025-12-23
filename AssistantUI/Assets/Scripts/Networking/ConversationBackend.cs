@@ -57,15 +57,19 @@ public class ConversationBackend : MonoBehaviour
             return;
         }
 
+        // Append used messages to UI
+        AppendMessage("user", prompt);
+        AddMessageToUI("user", prompt);
+
         // Clear input field and bring back cursor
         inputField.text = "";
         inputField.ActivateInputField();
 
-        StartCoroutine(SendMessageCoroutine());
+        StartCoroutine(SendMessageCoroutine(prompt));
     }
 
 
-    private IEnumerator SendMessageCoroutine()
+    private IEnumerator SendMessageCoroutine(string prompt)
     {
         // Reserve busy flag
         _requestInFlight = true;
@@ -94,6 +98,8 @@ public class ConversationBackend : MonoBehaviour
             temperature = temperature
         };
         string requestInJson = JsonUtility.ToJson(messageBody);
+        Debug.Log("REQUEST JSON:\n" + requestInJson);
+
 
         string backendUrl = $"http://127.0.0.1:{serverBackend.serverPort}/v1/chat/completions";
 
@@ -112,6 +118,7 @@ public class ConversationBackend : MonoBehaviour
             // Handle responses from server
             if (payload.result != UnityWebRequest.Result.Success)
             {
+
                 Debug.LogError("ConversationBackend: LLM request failed!");
                 AddMessageToUI("system", "Error encountered while processing request.");
                 _requestInFlight = false;
@@ -141,12 +148,46 @@ public class ConversationBackend : MonoBehaviour
             {
                 responseContent = parsedResponse.choices[0].message.content;
             }
-            //string cleanedResponseContent = CleanResponse(responseContent);
+            string cleanedResponseContent = CleanResponse(responseContent);
+
+            Debug.Log("MOIMOIMOI");
+            Debug.Log(cleanedResponseContent);
 
             // Add response to chat history
-            //AppendMessage("assistant", cleanedResponseContent);
-            //AddMessageToUI("assistant", cleanedResponseContent);
+            AppendMessage("assistant", cleanedResponseContent);
+            AddMessageToUI("assistant", cleanedResponseContent);
         }
+        _requestInFlight = false;
+    }
+
+
+    private void AppendMessage(string role, string content)
+    {
+        _messages.Add(new ChatMessage
+        {
+            role = role,
+            content = (content ?? "").Trim()
+        });
+    }
+
+
+    private string CleanResponse(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return "";
+        }
+
+        // Remove <think> blocks
+        int endThink = text.IndexOf("</think>", StringComparison.OrdinalIgnoreCase);
+        if (endThink >= 0)
+        {
+            text = text.Substring(endThink + "</think>".Length).Trim();
+        }
+
+        // Rest of the cleanup
+        text = text.Replace("*", "").Replace("###", "").Replace("---", "").Trim();
+        return text;
     }
 
 
