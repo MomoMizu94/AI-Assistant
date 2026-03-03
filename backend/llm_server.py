@@ -64,11 +64,7 @@ class LLMServerManager:
 
     ### STOP THE SERVER ###
     def stop(self, conversation=None):
-        # Stops LLM server and clears conversation history optionally
-        if conversation:
-            conversation.clear(keep_system=True)
-            print(">> Conversation history cleared.")
-        
+        # Safety checks and stops LLM server
         if not self.is_running():
             print(">> No LLM server running.")
             return
