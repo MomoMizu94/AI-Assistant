@@ -58,7 +58,8 @@ def health():
     return {
         "status": "ok",
         "llm_server_running": server.is_running(),
-        "history_count": len(conversation.get())
+        "history_count": len(conversation.get()),
+        "busy": busy_lock.locked(),
     }
 
 @app.get("/api/history")
@@ -89,3 +90,14 @@ def chat(req: ChatRequest):
         }
     finally:
         busy_lock.release()
+
+@app.post("/api/server/start")
+def start_server():
+    if not server.is_running():
+        server.start()
+    return {"ok": True, "llm_server_running": server.is_running()}
+
+@app.post("/api/server/stop")
+def stop_server():
+    server.stop(conversation)
+    return {"ok": True, "message": "LLM server stopped running."}
