@@ -6,8 +6,9 @@ MODEL_NAME = "Qwen3.5-35B-A3B-UD-Q6_K_XL.gguf"
 SERVER_PORT = 8080
 AUTO_SHUTDOWN = 600
 CHAT_HISTORY_FILE = "/tmp/assistant_history.json"
-DATA_DIR = os.path.expanduser("~/.local/share/ai-assistant/chats")
-CHAT_DIR = os.path.join(DATA_DIR, "chats")
+DATA_DIR = os.path.expanduser("~/.local/share/ai-assistant")
+CHATS_DIR = os.path.join(DATA_DIR, "chats")
+SYSTEM_PROMPT = "You are a concise and friendly AI assistant that gives answers without emojis."
 
 ### AUDIO SETTINGS ###
 WHISPER_MODEL = "large-v3"
