@@ -190,4 +190,5 @@ def start_server():
 @app.post("/api/server/stop")
 def stop_server():
     # Stops the LLM server
-    return {"ok": True, "message": "LLM server stopped running."}
+    server.stop()
+    return {"ok": True, "llm_server_running": server.is_running()}
