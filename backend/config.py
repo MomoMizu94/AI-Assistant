@@ -24,3 +24,6 @@ LLM_SERVER_BIN = os.path.expanduser("~/Documents/GitHub/llama.cpp/build/bin/llam
 LLM_MODEL_PATH = os.path.expanduser("~/Documents/GitHub/llama.cpp/models/Qwen3.5-35B-A3B-UD-Q6_K_XL.gguf")
 LLM_PID_FILE = "/tmp/llm_server.pid"
 TEMPERATURE = 0.7
+
+### LOCAL SETTINGS FILE PATH ###
+SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")

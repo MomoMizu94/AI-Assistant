@@ -1,13 +1,15 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Any, Dict
 import threading, time
 
-from config import *
+import config
 from llm_client import LLMClient
 from llm_server import LLMServerManager
 from conversation_manager import ConversationManager
 from chat_manager import ChatManager
+from settings_manager import SettingsManager
 
 
 app = FastAPI(title="AI Assistant Bridge")
@@ -33,22 +35,43 @@ class CreateChatRequest(BaseModel):
 class RenameChatRequest(BaseModel):
     title: str
 
+class SettingsUpdateRequest(BaseModel):
+    updates: Dict[str, Any] = Field(default_factory=dict)
+
 
 ### Shared backend objects ###
 server = LLMServerManager(
-    bin_path = LLM_SERVER_BIN,
-    model_path = LLM_MODEL_PATH,
-    port = SERVER_PORT,
-    pid_file = LLM_PID_FILE,
-    auto_shutdown=AUTO_SHUTDOWN
+    bin_path = config.LLM_SERVER_BIN,
+    model_path = config.LLM_MODEL_PATH,
+    port = config.SERVER_PORT,
+    pid_file = config.LLM_PID_FILE,
+    auto_shutdown = config.AUTO_SHUTDOWN
 )
 
 chat_manager = ChatManager(
-    CHATS_DIR,
-    system_prompt=SYSTEM_PROMPT
+    config.CHATS_DIR,
+    system_prompt = config.SYSTEM_PROMPT
 )
 
 default_chat = chat_manager.ensure_default_chat()
+
+# Use blocklist to block some settings from config.py to be showed
+settings_blocklist = {}
+settings_restart_required = {}
+
+# Helper function to build default settings
+def build_settings_defaults():
+    settings_defaults = {}
+    for key, value in vars(config).items():
+        if not key.isupper() or key.startswith("_"):
+            continue
+        if key in settings_blocklist:
+            continue
+        settings_defaults[key] = value
+    return settings_defaults
+
+SETTINGS_DEFAULTS = build_settings_defaults()
+settings_manager = SettingsManager(config.SETTINGS_FILE_PATH, SETTINGS_DEFAULTS)
 
 # Audio manager later?
 
@@ -142,9 +165,9 @@ def chat(chat_id: str, req: ChatRequest):
         # Send a message to server
         import requests
         payload = {
-            "model": MODEL_NAME,
+            "model": config.MODEL_NAME,
             "messages": messages,
-            "temperature": TEMPERATURE
+            "temperature": config.TEMPERATURE
         }
 
         r = requests.post(
