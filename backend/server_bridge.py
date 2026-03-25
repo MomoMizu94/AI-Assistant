@@ -1,13 +1,11 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Any, Dict
 import threading, time
 
 import config
-from llm_client import LLMClient
 from llm_server import LLMServerManager
-from conversation_manager import ConversationManager
 from chat_manager import ChatManager
 from settings_manager import SettingsManager
 
@@ -35,9 +33,6 @@ class CreateChatRequest(BaseModel):
 class RenameChatRequest(BaseModel):
     title: str
 
-class SettingsUpdateRequest(BaseModel):
-    updates: Dict[str, Any] = Field(default_factory=dict)
-
 
 ### Shared backend objects ###
 server = LLMServerManager(
@@ -53,11 +48,9 @@ chat_manager = ChatManager(
     system_prompt = config.SYSTEM_PROMPT
 )
 
-default_chat = chat_manager.ensure_default_chat()
-
 # Use blocklist to block some settings from config.py to be showed
-settings_blocklist = {}
-settings_restart_required = {}
+settings_blocklist = set()
+settings_restart_required = {"LLM_MODEL_PATH", "SERVER_PORT", "LLM_SERVER_BIN", "MODEL_NAME"}
 
 # Helper function to build default settings
 def build_settings_defaults():
@@ -164,10 +157,11 @@ def chat(chat_id: str, req: ChatRequest):
 
         # Send a message to server
         import requests
+        effective = settings_manager.get_merged_settings()
         payload = {
-            "model": config.MODEL_NAME,
+            "model": effective["MODEL_NAME"],
             "messages": messages,
-            "temperature": config.TEMPERATURE
+            "temperature": float(effective["TEMPERATURE"]),
         }
 
         r = requests.post(
@@ -215,3 +209,93 @@ def stop_server():
     # Stops the LLM server
     server.stop()
     return {"ok": True, "llm_server_running": server.is_running()}
+
+@app.get("/api/settings")
+def get_settings():
+    return {"settings": settings_manager.get_merged_settings()}
+
+@app.post("/api/settings")
+def update_settings(updates: Dict[str, Any] = Body(...)):
+    """Updates all settings of the json"""
+    # Filter allowed parameters (config - blocklist)
+    allowed_params = set(SETTINGS_DEFAULTS.keys())
+    # Incoming parameters from UI
+    incoming_params = {key: value for key, value in updates.items() if key not in allowed_params}
+
+    # "Safety check"
+    if not incoming_params:
+        return {
+            "ok": True,
+            "settings": settings_manager.get_merged_settings(),
+            "restart_required": False,
+            "ignored_keys": [key for key in updates.keys() if key not in allowed_params],
+        }
+    
+    # Use defaults as source of truth
+    for key, value in list(incoming_params.items()):
+        default_value = SETTINGS_DEFAULTS[key]
+
+        # For converting / handling value types
+        try:
+            if isinstance(default_value, bool):
+                if isinstance(value, str):
+                    incoming_params[key] = value.strip().lower() in ("1", "true", "yes", "on")
+                else:
+                    incoming_params[key] = bool(value)
+            
+            elif isinstance(default_value, int) and not isinstance(default_value, bool):
+                if isinstance(value, str):
+                    incoming_params[key] = int(value.strip())
+                else:
+                    incoming_params[key] = int(value)
+
+            elif isinstance(default_value, float):
+                if isinstance(value, str):
+                    incoming_params[key] = float(value.strip())
+                else:
+                    incoming_params[key] = float(value)
+
+            elif isinstance(default_value, str):
+                incoming_params[key] = str(value)
+
+        except Exception:
+            raise HTTPException(status_code=400, detail=f"Invalid value for {key}")
+        
+    # Constraints for some config values
+    if "TEMPERATURE" in incoming_params:
+        t = float(incoming_params["TEMPERATURE"])
+        if t < 0 or t > 2:
+            raise HTTPException(status_code=400, detail="TEMPERATURE must be between 0 and 2")
+        
+    if "AUTO_SHUTDOWN" in incoming_params:
+        s = int(incoming_params["AUTO_SHUTDOWN"])
+        if s < 0:
+            raise HTTPException(status_code=400, detail="AUTO_SHUTDOWN must be a positive number")
+
+    if "SERVER_PORT" in incoming_params:
+        p = int(incoming_params["SERVER_PORT"])
+        if p < 1 or p > 65535:
+            raise HTTPException(status_code=400, detail="SERVER_PORT must be between 1 and 65535")
+        
+    # Load overrides from settings.json
+    overrides = settings_manager.load_overrides()
+    overrides.update(incoming_params)
+    settings_manager.save_overrides(overrides)
+
+    # Build settings (from overrides & defaults)
+    effective_settings = settings_manager.get_merged_settings()
+
+    # Apply effective settings if safe
+    if "AUTO_SHUTDOWN" in incoming_params:
+        server.auto_shutdown = int(effective_settings["AUTO_SHUTDOWN"])
+
+    # Determine whether restart is required for changes to apply
+    restart_required = any(key in incoming_params for key in settings_restart_required)
+
+    return {
+        "ok": True,
+        "settings": effective_settings,
+        "restart_required": restart_required,
+        "updated_keys": sorted(list(incoming_params.keys())),
+        "ignored_keys": [key for key in updates.keys() if key not in allowed_params],
+    }
