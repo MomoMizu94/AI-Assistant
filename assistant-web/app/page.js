@@ -108,6 +108,40 @@ export default function Home() {
     }
   }
 
+  async function renameChat(chatId) {
+    const currentChat = chats.find((c) => c.id === chatId);
+    const newTitle = window.prompt("Rename chat:", currentChat?.title || "New chat");
+    
+    // User cancels
+    if (newTitle == null)
+    {
+      return;
+    }
+
+    const title = newTitle.trim();
+    if (!title)
+    {
+      return;
+    }
+
+    setErr("");
+    try {
+      const response = await fetch(`/api/chats/${chatId}/rename`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Renaming failed!");
+      }
+      await loadChats();
+    } catch (e) {
+      setErr(e.message || "Renaming failed!");
+    }
+  }
+
   // ------------------ Boot ----------------------
   useEffect(() => {
     // Step 1: Load health
@@ -281,7 +315,7 @@ export default function Home() {
           {filteredChats.map((c) => {
             const isActive = c.id === activeChatId;
             return (
-              <button
+              <div
                 key={c.id}
                 onClick={async () => {
                   setErr("");
@@ -306,7 +340,21 @@ export default function Home() {
               >
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{formatChatTitle(c)}</div>
                 <div style={{ fontSize: 12, opacity: 0.75 }}>{c.updated_at}</div>
-              </button>
+                {isActive && (
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation(); // prevent selecting chat again
+                        renameChat(c.id);
+                      }}
+                      style={{ padding: "6px 10px" }}
+                    >
+                      Rename
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </aside>
