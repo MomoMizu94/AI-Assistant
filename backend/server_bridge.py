@@ -49,7 +49,7 @@ chat_manager = ChatManager(
 )
 
 # Use blocklist to block some settings from config.py to be showed
-settings_blocklist = set()
+settings_blocklist = {"LLM_PID_FILE", "PIPE_PATH", "CHANNELS"}
 settings_restart_required = {"LLM_MODEL_PATH", "SERVER_PORT", "LLM_SERVER_BIN", "MODEL_NAME"}
 
 # Helper function to build default settings

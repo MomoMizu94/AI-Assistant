@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 export default function Home() {
   // Chat state
@@ -182,7 +183,11 @@ export default function Home() {
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1>AI Assistant</h1>
+      
+      <div style={{ display: "flex", alignItems: "center" }}>
+        <h1 style={{ margin: 0 }}>AI Assistant</h1>
+        <Link href="/settings" style={{ marginLeft: "auto" }}>Settings</Link>
+      </div>
 
       {/* Top status bar */}
       <div
