@@ -16,6 +16,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [health, setHealth] = useState(null);
+  const [chatFilter, setChatFilter] = useState("");
 
   function formatChatTitle(chat) {
     return (chat?.title || "Chat").trim();
@@ -142,8 +143,16 @@ export default function Home() {
   async function send(e) {
     e.preventDefault();
     const text = prompt.trim();
-    if (!text || loading) 
+    if (!text || loading)
+    {
+      return; 
+    }
+
+    if (!activeChatId)
+    {
+      setErr("No chat selected. Create or select a chat first!");
       return;
+    }
 
     if (health && !health.llm_server_running) {
       setErr("LLM server is stopped. Click 'Start server' first.");
@@ -180,6 +189,15 @@ export default function Home() {
       setLoading(false);
     }
   }
+  const filteredChats = chats.filter((c) => {
+    const query = chatFilter.trim().toLowerCase();
+    if (!query)
+    {
+      return true;
+    }
+    const title = (c.title || "").toLowerCase();
+    return title.includes(query);
+  });
 
   return (
     <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
@@ -253,7 +271,14 @@ export default function Home() {
             </button>
           </div>
 
-          {chats.map((c) => {
+          <input
+            value={chatFilter}
+              onChange={(e) => setChatFilter(e.target.value)}
+              placeholder="Search chats..."
+              style={{ width: "100%", padding: 8, borderRadius: 8, border: "2px solid #474747", marginBottom: 10 }}
+          />
+
+          {filteredChats.map((c) => {
             const isActive = c.id === activeChatId;
             return (
               <button
