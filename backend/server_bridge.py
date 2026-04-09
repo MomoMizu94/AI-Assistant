@@ -52,8 +52,10 @@ chat_manager = ChatManager(
 settings_blocklist = {"LLM_PID_FILE", "PIPE_PATH", "CHANNELS"}
 settings_restart_required = {"LLM_MODEL_PATH", "SERVER_PORT", "LLM_SERVER_BIN", "MODEL_NAME"}
 
-# Helper function to build default settings
+### HELPER FUNCTIONS ###
+
 def build_settings_defaults():
+    # Builds default settings
     settings_defaults = {}
     for key, value in vars(config).items():
         if not key.isupper() or key.startswith("_"):
@@ -65,6 +67,12 @@ def build_settings_defaults():
 
 SETTINGS_DEFAULTS = build_settings_defaults()
 settings_manager = SettingsManager(config.SETTINGS_FILE_PATH, SETTINGS_DEFAULTS)
+
+def from_prompt_to_title(prompt: str, max_words:int = 5) -> str:
+    # Forms a chat title from first 5 words of the initial prompt
+    words = prompt.strip().split()
+    return " ".join(words[:max_words])
+
 
 # Audio manager later?
 
@@ -188,6 +196,25 @@ def chat(chat_id: str, req: ChatRequest):
         })
         # Save
         chat_manager.save_messages(chat_id, messages)
+
+        # Auto-title
+        # If still titled as "New chat" or empty, rename based on first user prompt
+        try:
+            meta = None
+            # List and find correct chat
+            for m in chat_manager.list_chats():
+                if m.get("id") == chat_id:
+                    meta = m
+                    break
+
+            if meta and (meta.get("title") or "").strip().lower() in ("new chat", ""):
+                title = from_prompt_to_title(prompt, max_words=5)
+                if title:
+                    chat_manager.rename_chat(chat_id, title)
+        
+        except Exception as e:
+            print("Auto titling failed:", e)
+
 
         return {
             "response": content
