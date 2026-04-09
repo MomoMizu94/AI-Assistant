@@ -142,6 +142,43 @@ export default function Home() {
     }
   }
 
+  async function deleteChat(chatId) {
+    const currentChat = chats.find((c) => c.id === chatId);
+    const ok = window.confirm(`Delete chat "${currentChat?.title || chatId}"? This can't be undone.`);
+    if (!ok)
+    {
+      return;
+    }
+
+    setErr("");
+    try {
+      const response = await fetch(`/api/chats/${chatId}`, { method: "DELETE" });
+
+      if (!response.ok)
+      {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || "Deleting chat failed!");
+      }
+
+      const list = await loadChats();
+
+      // Select new chat if active chat was deleted
+      if (activeChatId == chatId) {
+        if (list.length > 0)
+        {
+          setActiveChatId(list[0].id);
+          await loadSingleChat(list[0].id);
+        }
+        else
+        {
+          await createNewChat();
+        }
+      }
+    } catch (e) {
+      setErr(e.message || "Deleting chat failed!");
+    }
+  }
+
   // ------------------ Boot ----------------------
   useEffect(() => {
     // Step 1: Load health
@@ -351,6 +388,16 @@ export default function Home() {
                       style={{ padding: "6px 10px" }}
                     >
                       Rename
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteChat(c.id);
+                      }}
+                      style={{ padding: "6px 10px" }}
+                    >
+                      Delete
                     </button>
                   </div>
                 )}
