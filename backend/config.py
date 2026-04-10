@@ -2,10 +2,13 @@ import os
 
 ### PATHS & MODEL SETTINGS ###
 PIPE_PATH = "/tmp/ai-assistant.pipe"
-MODEL_NAME = "Qwen3-32B-UD-Q6_K_XL.gguf"
+MODEL_NAME = "Qwen3.5-35B-A3B-UD-Q6_K_XL.gguf"
 SERVER_PORT = 8080
 AUTO_SHUTDOWN = 600
 CHAT_HISTORY_FILE = "/tmp/assistant_history.json"
+DATA_DIR = os.path.expanduser("~/.local/share/ai-assistant")
+CHATS_DIR = os.path.join(DATA_DIR, "chats")
+SYSTEM_PROMPT = "You are a concise and friendly AI assistant that gives answers without emojis."
 
 ### AUDIO SETTINGS ###
 WHISPER_MODEL = "large-v3"
@@ -18,6 +21,9 @@ PIPER_CONFIG = os.path.expanduser("~/Documents/GitHub/AI-Assistant/TTS/models/en
 
 ### LLM SERVER SETTINGS ###
 LLM_SERVER_BIN = os.path.expanduser("~/Documents/GitHub/llama.cpp/build/bin/llama-server")
-LLM_MODEL_PATH = os.path.expanduser("~/Documents/GitHub/llama.cpp/models/Qwen3-32B-UD-Q6_K_XL.gguf")
+LLM_MODEL_PATH = os.path.expanduser("~/Documents/GitHub/llama.cpp/models/Qwen3.5-35B-A3B-UD-Q6_K_XL.gguf")
 LLM_PID_FILE = "/tmp/llm_server.pid"
 TEMPERATURE = 0.7
+
+### LOCAL SETTINGS FILE PATH ###
+SETTINGS_FILE_PATH = os.path.join(DATA_DIR, "settings.json")

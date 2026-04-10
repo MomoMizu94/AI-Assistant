@@ -1,4 +1,8 @@
-import time, os, subprocess, signal, requests
+import time
+import os
+import subprocess
+import signal
+import requests
 
 class LLMServerManager:
     def __init__(self, bin_path, model_path, port, pid_file, auto_shutdown):
@@ -64,18 +68,23 @@ class LLMServerManager:
 
     ### STOP THE SERVER ###
     def stop(self, conversation=None):
-        # Stops LLM server and clears conversation history optionally
-        if conversation:
-            conversation.clear(keep_system=True)
-            print(">> Conversation history cleared.")
-        
+        # Safety checks and stops LLM server
         if not self.is_running():
-            print(">> No LLM server running.")
+            print(">> No LLM server running: No pid file found")
             return
 
         try:
             with open(self.pid_file) as f:
                 pid = int(f.read().strip())
+
+            # For stale pid files
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                print(">>> PID file stale. Cleaning up...")
+                os.remove(self.pid_file)
+                return
+            
             print(f">> Stopping LLM server with PID: {pid}")
             os.kill(pid, signal.SIGTERM)
             os.remove(self.pid_file)

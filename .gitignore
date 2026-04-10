@@ -195,3 +195,13 @@ cython_debug/
 
 # Custom
 TTS/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+*.log
+.env.local
+.env.*.local
