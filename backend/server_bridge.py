@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body, Response
+from fastapi import FastAPI, HTTPException, Body, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict
@@ -362,3 +362,63 @@ def export_chat(chat_id: str):
             "Content-Disposition": f'attachment; filename="{filename}"'
         },
     )
+
+@app.post("/api/chats/import")
+async def import_chat(file: UploadFile = File(...)):
+    # Safety checks
+    if not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Please upload a valid .json file")
+    
+    raw = await file.read()
+
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid json")
+    
+    # Check for invalid formats
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=400, detail="Invalid import format (not a dictionary)")
+    
+    messages = data.get("messages")
+    if not isinstance(messages, list):
+        raise HTTPException(status_code=400, detail="Invalid import format (messages are not in a list)")
+    
+    # Only valid messages continue
+    cleaned_messages = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = message.get("role")
+        content = message.get("content")
+        if role not in ("system", "user", "assistant"):
+            continue
+        if not isinstance(content, str):
+            continue
+        cleaned_messages.append({"role": role, "content": content.strip()})
+
+    if not cleaned_messages:
+        raise HTTPException(status_code=400, detail="No valid messages found in the imported file")
+    
+    # Ensure system message at start
+    if cleaned_messages[0]["role"] != "system":
+        cleaned_messages.insert(0, {"role": "system", "content": config.SYSTEM_PROMPT})
+    
+    meta_in = data.get("meta")
+    if not isinstance(meta_in, dict):
+        meta_in = {}
+
+    title = meta_in.get("title", "Imported chat")
+    if isinstance(title, str):
+        title = title.strip()
+    else:
+        title = "Imported chat"
+
+    if not title:
+        title = "Imported chat"
+
+    # New chat creation
+    new_meta = chat_manager.create_chat(title=title)
+    chat_manager.save_messages(new_meta["id"], cleaned_messages)
+
+    return {"ok": True, "chat": new_meta}
