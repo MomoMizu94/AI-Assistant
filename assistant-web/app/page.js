@@ -399,6 +399,17 @@ export default function Home() {
                     >
                       Delete
                     </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!activeChatId) return;
+                        window.location.href = `/api/chats/${activeChatId}/export`;
+                      }}
+                      style={{ padding: "6px 10px" }}
+                    >
+                      Export
+                    </button>
                   </div>
                 )}
               </div>

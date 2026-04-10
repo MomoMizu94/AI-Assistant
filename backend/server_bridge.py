@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any, Dict
-import threading, time
+import threading, time, json
 
 import config
 from llm_server import LLMServerManager
@@ -326,3 +326,39 @@ def update_settings(updates: Dict[str, Any] = Body(...)):
         "updated_keys": sorted(list(incoming_params.keys())),
         "ignored_keys": [key for key in updates.keys() if key not in allowed_params],
     }
+
+@app.get("/api/chats/{chat_id}/export")
+def export_chat(chat_id: str):
+    # Read data from disk
+    meta = None
+    for m in chat_manager.list_chats():
+        if m.get("id") == chat_id:
+            meta = m
+            break
+    
+    # Check whether chat was found or not
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Chat not found!")
+    
+    messages = chat_manager.get_messages(chat_id)
+    # Check for format errors
+    if not isinstance(messages, list):
+        raise HTTPException(status_code=500, detail="Chat messages found but they are not in list format!")
+    
+    payload = {
+        "version": 1,
+        "meta": meta,
+        "messages": messages,
+    }
+
+    # Title sanitization
+    title = (meta.get("title") or "chat").strip().replace("/", "_")
+    filename = f"{title}-{chat_id}.json"
+
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False, indent=2),
+        media_type="application/json",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        },
+    )
