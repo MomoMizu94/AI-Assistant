@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRef } from "react";
 
 export default function Home() {
   // Chat state
@@ -17,6 +18,9 @@ export default function Home() {
   const [err, setErr] = useState("");
   const [health, setHealth] = useState(null);
   const [chatFilter, setChatFilter] = useState("");
+
+  // File import/export
+  const fileInputRef = useRef(null);
 
   function formatChatTitle(chat) {
     return (chat?.title || "Chat").trim();
@@ -176,6 +180,32 @@ export default function Home() {
       }
     } catch (e) {
       setErr(e.message || "Deleting chat failed!");
+    }
+  }
+
+  async function importChat(file) {
+    setErr("");
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const response = await fetch("/api/chats/import", {
+        method: "POST",
+        body: form,
+      });
+
+      const data = await await response.json().catch(() => ({}));
+      // Catch errors
+      if (!response.ok)
+        throw new Error(data.detail || "Importing failed!");
+
+      // Refresh and switch to imported chat
+      await loadChats();
+      setActiveChatId(data.chat.id);
+      await loadSingleChat(data.chat.id);
+    } catch (e) {
+      setErr(e.message || "Importing failed!")
     }
   }
 
@@ -340,6 +370,25 @@ export default function Home() {
             <button onClick={createNewChat} disabled={loading} style={{ flex: 1 }}>
               + New chat
             </button>
+            <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={loading}
+              >
+                Import
+              </button>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json,application/json"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = ""; // allow importing same file twice
+                  if (f) importChat(f);
+                }}
+              />
           </div>
 
           <input
