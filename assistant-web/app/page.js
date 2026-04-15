@@ -22,6 +22,9 @@ export default function Home() {
   // File import/export
   const fileInputRef = useRef(null);
 
+  // Audio
+  const [audioState, setAudioState] = useState({ recording: false, speak_responses: false });
+
   function formatChatTitle(chat) {
     return (chat?.title || "Chat").trim();
 }
@@ -209,6 +212,28 @@ export default function Home() {
     }
   }
 
+  async function loadAudioState(params) {
+    const response = await fetch("/api/audio/state");
+    const data = await response.json();
+    setAudioState(data);
+  }
+
+  async function toggleSpeakResponses(enabled) {
+    setErr("");
+
+    try {
+      const response = await fetch("/api/audio/speak_enabled", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      });
+      const data = await response.json();
+      setAudioState((prev) => ({ ...prev, speak_responses: data.speak_responses }));
+    } catch {
+      setErr("Failed to toggle response reading!");
+    }
+  }
+
   // ------------------ Boot ----------------------
   useEffect(() => {
     // Step 1: Load health
@@ -236,6 +261,9 @@ export default function Home() {
     const id = setInterval(() => {
       loadHealth().catch(() => {});
     }, 3000);
+
+    // Step 4: Load audio state
+    loadAudioState().catch(() => {});
 
     return () => clearInterval(id);
   }, []);
@@ -322,6 +350,14 @@ export default function Home() {
       >
         <div>
           <strong>Backend:</strong> {health ? "Connected" : "..."}
+          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              type="checkbox"
+              checked={!!audioState.speak_responses}
+              onChange={(e) => toggleSpeakResponses(e.target.checked)}
+            />
+            <span>Speak responses</span>
+          </label>
         </div>
         <div>
           <strong>LLM server:</strong>{" "}

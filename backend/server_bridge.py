@@ -8,6 +8,7 @@ import config
 from llm_server import LLMServerManager
 from chat_manager import ChatManager
 from settings_manager import SettingsManager
+from audio_manager import AudioManager
 
 
 app = FastAPI(title="AI Assistant Bridge")
@@ -33,6 +34,9 @@ class CreateChatRequest(BaseModel):
 class RenameChatRequest(BaseModel):
     title: str
 
+class SpeakToggleRequest(BaseModel):
+    enabled: bool
+
 
 ### Shared backend objects ###
 server = LLMServerManager(
@@ -48,12 +52,29 @@ chat_manager = ChatManager(
     system_prompt = config.SYSTEM_PROMPT
 )
 
+audio_manager = AudioManager(
+    whisper_model=config.WHISPER_MODEL,
+    piper_model=config.PIPER_MODEL,
+    piper_config=config.PIPER_CONFIG,
+    mic_rate=config.SAMPLE_RATE,
+    tts_rate=config.PIPER_SAMPLE_RATE,
+    channels=config.CHANNELS,
+    record_timeout=config.RECORD_TIMEOUT
+)
+
+# Toggle for audio assistant replies
+speak_responses = False
+
 # Use blocklist to block some settings from config.py to be showed
 settings_blocklist = {"LLM_PID_FILE", "PIPE_PATH", "CHANNELS"}
 settings_restart_required = {"LLM_MODEL_PATH", "SERVER_PORT", "LLM_SERVER_BIN", "MODEL_NAME"}
 
-### HELPER FUNCTIONS ###
+### Locks ###
+busy_lock = threading.Lock()
+tts_lock = threading.Lock()
 
+
+### HELPER FUNCTIONS ###
 def build_settings_defaults():
     # Builds default settings
     settings_defaults = {}
@@ -73,15 +94,29 @@ def from_prompt_to_title(prompt: str, max_words:int = 5) -> str:
     words = prompt.strip().split()
     return " ".join(words[:max_words])
 
-
-# Audio manager later?
-
-
-### Lock ###
-busy_lock = threading.Lock()
+def speak_async(text: str):
+    # Play TTS in a background thread
+    if not text:
+        return
+    
+    def _run():
+        # Prevent overlapping playback
+        if not tts_lock.acquire(blocking=False):
+            return
+        
+        try:
+            audio_manager.speak(text)
+        finally:
+            tts_lock.release()
+        
+    threading.Thread(target=_run, daemon=True).start()
 
 
 ### API endpoints ###
+@app.on_event("startup")
+def start_audio_thread():
+    threading.Thread(target=audio_manager.record_loop, daemon=True).start()
+
 @app.get("/api/health")
 def health():
     # Fetches server health status
@@ -194,6 +229,11 @@ def chat(chat_id: str, req: ChatRequest):
             "role": "assistant",
             "content": content
         })
+
+        # Speak responses outloud
+        if speak_responses and content and not content.lower().startswith("error"):
+            speak_async(content)
+
         # Save
         chat_manager.save_messages(chat_id, messages)
 
@@ -214,7 +254,6 @@ def chat(chat_id: str, req: ChatRequest):
         
         except Exception as e:
             print("Auto titling failed:", e)
-
 
         return {
             "response": content
@@ -247,7 +286,7 @@ def update_settings(updates: Dict[str, Any] = Body(...)):
     # Filter allowed parameters (config - blocklist)
     allowed_params = set(SETTINGS_DEFAULTS.keys())
     # Incoming parameters from UI
-    incoming_params = {key: value for key, value in updates.items() if key not in allowed_params}
+    incoming_params = {key: value for key, value in updates.items() if key in allowed_params}
 
     # "Safety check"
     if not incoming_params:
@@ -422,3 +461,16 @@ async def import_chat(file: UploadFile = File(...)):
     chat_manager.save_messages(new_meta["id"], cleaned_messages)
 
     return {"ok": True, "chat": new_meta}
+
+@app.get("/api/audio/state")
+def audio_state():
+    return {
+        "recording": bool(getattr(audio_manager, "recording", False)),
+        "speak_responses": speak_responses,
+    }
+
+@app.post("/api/audio/speak_enabled")
+def set_speak_outloud(req: SpeakToggleRequest):
+    global speak_responses
+    speak_responses = bool(req.enabled)
+    return { "ok": True, "speak_responses": speak_responses }
