@@ -114,7 +114,7 @@ def speak_async(text: str):
 
 ### API endpoints ###
 @app.on_event("startup")
-def start_audio_thread():
+def start_record_thread():
     threading.Thread(target=audio_manager.record_loop, daemon=True).start()
 
 @app.get("/api/health")
@@ -230,7 +230,7 @@ def chat(chat_id: str, req: ChatRequest):
             "content": content
         })
 
-        # Speak responses outloud
+        # Speak responses outloud if enabled
         if speak_responses and content and not content.lower().startswith("error"):
             speak_async(content)
 
@@ -474,3 +474,104 @@ def set_speak_outloud(req: SpeakToggleRequest):
     global speak_responses
     speak_responses = bool(req.enabled)
     return { "ok": True, "speak_responses": speak_responses }
+
+@app.post("/api/audio/record/toggle")
+def toggle_recording(chat_id: str):
+    # Toggle recording and handle transcription + sending it to server
+    audio_manager.recording = not bool(getattr(audio_manager, "recording", False))
+
+    # If turned recording ON
+    if audio_manager.recording:
+        return { "ok": True, "recording": True }
+    
+    # If turned recording OFF -> transcribe
+    transcript = audio_manager.transcribe()
+    if not transcript:
+        return { "ok": True, "recording": False, "transcript": "", "response": "" }
+    
+    # Prevent overlapping requests/file writes
+    if not busy_lock.acquire(blocking=False):
+        raise HTTPException(status_code=409, detail="Assistant is currently busy. Try again later.")
+    
+    try:
+        # Load messages for the chat and append transcript
+        messages = chat_manager.get_messages(chat_id)
+        messages.append({"role": "user", "content": transcript})
+
+
+        # Handle message sending if server is stopped
+        if not server.is_running():
+            return {
+                "ok": False,
+                "recording": False,
+                "transcript": transcript,
+                "response": "",
+                "error": "LLM server is stopped. Click 'start server' before sending."
+            }
+        
+        # Build the request
+        import requests
+        effective = settings_manager.get_merged_settings()
+        payload = {
+            "model": effective["MODEL_NAME"],
+            "messages": messages,
+            "temperature": float(effective["TEMPERATURE"]),
+        }
+
+        r = requests.post(
+            f"http://127.0.0.1:{server.port}/v1/chat/completions",
+            json=payload,
+            timeout=300
+        )
+        r.raise_for_status()
+        data = r.json()
+        
+        # Reply extraction
+        raw = data["choices"][0]["message"]["content"]
+        content = raw
+        
+        # Cleaning the response
+        if "<think>" in content and "</think>" in content:
+            content = content.split("</think>", 1)[-1].strip()
+        content = content.replace("*", "").replace("###", "").replace("---", "").strip()
+
+        # Append to messages
+        messages.append({
+            "role": "assistant",
+            "content": content
+        })
+        # Save
+        chat_manager.save_messages(chat_id, messages)
+
+        # Auto-title
+        # If still titled as "New chat" or empty, rename based on first user prompt
+        try:
+            meta = None
+            # List and find correct chat
+            for m in chat_manager.list_chats():
+                if m.get("id") == chat_id:
+                    meta = m
+                    break
+
+            if meta and (meta.get("title") or "").strip().lower() in ("new chat", ""):
+                title = from_prompt_to_title(transcript, max_words=5)
+                if title:
+                    chat_manager.rename_chat(chat_id, title)
+        
+        except Exception as e:
+            print("Auto titling failed:", e)
+
+        # Speak responses outloud if enabled
+        if speak_responses and content and not content.lower().startswith("error"):
+            speak_async(content)
+
+        return {
+            "ok": True,
+            "recording": False,
+            "transcript": transcript,
+            "response": content
+        }
+    
+    finally:
+        # Release the lock
+        busy_lock.release()

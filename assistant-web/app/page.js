@@ -212,7 +212,7 @@ export default function Home() {
     }
   }
 
-  async function loadAudioState(params) {
+  async function loadAudioState() {
     const response = await fetch("/api/audio/state");
     const data = await response.json();
     setAudioState(data);
@@ -231,6 +231,44 @@ export default function Home() {
       setAudioState((prev) => ({ ...prev, speak_responses: data.speak_responses }));
     } catch {
       setErr("Failed to toggle response reading!");
+    }
+  }
+
+  async function toggleRecording() {
+    if (!activeChatId) {
+      setErr("No chat selected!");
+      return;
+    }
+
+    setErr("");
+    try {
+      const response = await fetch(`/api/audio/record/toggle?chat_id=${activeChatId}`, {
+        method: "POST",
+      });
+
+      //const data = await response.json().catch(() => ({}));
+      const text = await response.text();
+      let data = {};
+      try { data = JSON.parse(text); } catch {}
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || text || "Failed to toggle recording!");
+      }
+
+      setAudioState((prev) => ({ ...prev, recording: !!data.recording }));
+
+      // If recordgin just stopped and got response, append
+      if (!data.recording && data.transcript) {
+        setMessages((prev) => [
+          ...prev,
+          { role: "user", content: data.transcript },
+          { role: "assistant", content: data.response },
+        ]);
+        // Upddate chats
+        await loadChats();
+      }
+    } catch (e) {
+      setErr(e.message || "Recording failed due to unknown reason.");
     }
   }
 
@@ -549,6 +587,14 @@ export default function Home() {
                   style={{ border: "4px solid #00ffff", borderRadius: 8, padding: "10px 14px" }}
                 >
                   Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleRecording}
+                  disabled={loading || (health && !health.llm_server_running)}
+                  style={{ border: "4px solid #00ffff", borderRadius: 8, padding: "10px 14px" }}
+                >
+                  {audioState.recording ? "Stop Mic" : "Mic"}
                 </button>
               </form>
             </section>
