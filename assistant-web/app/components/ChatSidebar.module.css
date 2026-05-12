@@ -1,0 +1,146 @@
+.sidebar {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--color-surface-sidebar);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-card);
+  padding: var(--space-2);
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* ---- Top action buttons ---- */
+.topActions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.btnPrimary {
+  flex: 1;
+  padding: 8px var(--space-1);
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btnSecondary {
+  padding: 8px 12px;
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.btnSecondary:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+.btnSecondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- Search input ---- */
+.searchInput {
+  width: 100%;
+  padding: 8px var(--space-1);
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--border-subtle);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.searchInput:focus {
+  border-color: var(--color-accent);
+}
+
+.searchInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* ---- Chat list items ---- */
+.chatItem {
+  padding: var(--space-1);
+  border-radius: var(--border-radius-card);
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: background 0.1s ease, border-color 0.1s ease;
+}
+
+.chatItem:hover {
+  background: var(--color-surface-card);
+}
+
+/* Active state applied via conditional className in JS */
+.chatItemActive {
+  border-color: var(--color-accent);
+  background: var(--color-surface-card);
+}
+
+.chatTitle {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+  /* Prevents long titles from breaking the sidebar layout */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chatDate {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+/* ---- Per-chat action buttons (Rename / Delete / Export) ---- */
+.chatActions {
+  display: flex;
+  gap: 6px;
+  margin-top: var(--space-1);
+}
+
+.chatActionBtn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.chatActionBtn:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
