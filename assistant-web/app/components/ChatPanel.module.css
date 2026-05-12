@@ -1,0 +1,163 @@
+.panel {
+  flex: 1;
+  min-height: 0; /* allows the panel to shrink inside the flex row */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ---- Message list ---- */
+.messageList {
+  flex: 1;
+  min-height: 0; /* critical: lets overflow-y actually work in a flex child */
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-card);
+  padding: var(--space-2);
+  overflow-y: auto;
+  background: var(--color-surface-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Custom scrollbar — impossible with inline styles */
+.messageList::-webkit-scrollbar { width: 6px; }
+.messageList::-webkit-scrollbar-track { background: transparent; }
+.messageList::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 3px;
+}
+
+/* ---- Individual message ---- */
+.message {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.messageRole {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted);
+}
+
+/* User role gets the accent color */
+.messageRoleUser {
+  color: var(--color-accent);
+}
+
+.messageContent {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  color: var(--color-text-primary);
+}
+
+/* Thinking indicator — @keyframes is impossible with inline styles */
+.thinking {
+  font-style: italic;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.35; }
+}
+
+/* Placeholder shown when no chat or no messages */
+.placeholder {
+  margin: auto;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+/* ---- Input form ---- */
+.inputForm {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.textInput {
+  flex: 1;
+  padding: 10px var(--space-2);
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--border-subtle);
+  background: var(--color-surface-card);
+  color: var(--color-text-primary);
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+/* Focus ring — impossible with inline styles */
+.textInput:focus {
+  border-color: var(--color-accent);
+}
+
+.textInput::placeholder {
+  color: var(--color-text-muted);
+}
+
+.textInput:disabled {
+  opacity: 0.5;
+}
+
+.sendBtn {
+  padding: 10px var(--space-2);
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.9375rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sendBtn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.sendBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.iconBtn {
+  width: 42px;
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.iconBtn:hover:not(:disabled) {
+  color: var(--color-text-primary);
+  border-color: var(--color-accent);
+}
+
+/* Recording active state */
+.iconBtnActive {
+  border-color: #f87171;
+  color: #f87171;
+}
+
+.iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

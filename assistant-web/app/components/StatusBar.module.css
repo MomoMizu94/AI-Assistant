@@ -1,0 +1,123 @@
+.statusBar {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  background: var(--color-surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-card);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+}
+
+.value {
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  font-weight: 500;
+}
+
+/* Color variants for server status */
+.valueRunning { color: #4ade80; }
+.valueStopped { color: #f87171; }
+
+/* Push the controls to the far right */
+.controls {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ---- CSS toggle switch ---- */
+.speakToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* Visually hidden but still in the DOM — screen readers interact with it normally */
+.speakToggleInput {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.speakToggleTrack {
+  width: 36px;
+  height: 20px;
+  background: var(--border-subtle);
+  border-radius: 10px;
+  position: relative;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+/* Sibling selector: checked input → color the track */
+.speakToggleInput:checked + .speakToggleTrack {
+  background: var(--color-accent);
+}
+
+.speakToggleThumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s ease;
+}
+
+/* Checked → slide the thumb to the right */
+.speakToggleInput:checked + .speakToggleTrack .speakToggleThumb {
+  transform: translateX(16px);
+}
+
+.speakToggleLabel {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+
+.buttons {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: var(--border-radius-btn);
+  border: 1px solid var(--border-subtle);
+  background: var(--color-surface-sidebar);
+  color: var(--color-text-primary);
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* :not(:disabled) ensures hover does NOT fire on disabled buttons */
+.btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-card);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRef } from "react";
+import styles from "./page.module.css";
+import Header from "./components/Header";
+import StatusBar from "./components/StatusBar";
+import ChatSidebar from "./components/ChatSidebar";
+import ChatPanel from "./components/ChatPanel";
 
 export default function Home() {
   // Chat state
@@ -19,15 +22,8 @@ export default function Home() {
   const [health, setHealth] = useState(null);
   const [chatFilter, setChatFilter] = useState("");
 
-  // File import/export
-  const fileInputRef = useRef(null);
-
   // Audio
   const [audioState, setAudioState] = useState({ recording: false, speak_responses: false });
-
-  function formatChatTitle(chat) {
-    return (chat?.title || "Chat").trim();
-}
 
   // -------------- Backend Calls ----------------
   async function loadHealth() {
@@ -367,238 +363,54 @@ export default function Home() {
   });
 
   return (
-    <main style={{ maxWidth: 1100, margin: "0 auto", padding: 16, fontFamily: "sans-serif" }}>
-      
-      <div style={{ display: "flex", alignItems: "center" }}>
-        <h1 style={{ margin: 0 }}>AI Assistant</h1>
-        <Link href="/settings" style={{ marginLeft: "auto" }}>Settings</Link>
-      </div>
+    <main className={styles.root}>
+      <Header />
 
-      {/* Top status bar */}
-      <div
-        style={{
-          display: "flex",
-          gap: 12,
-          alignItems: "center",
-          marginBottom: 12,
-          padding: 10,
-          border: "4px solid #474747",
-          borderRadius: 8,
-        }}
-      >
-        <div>
-          <strong>Backend:</strong> {health ? "Connected" : "..."}
-          <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="checkbox"
-              checked={!!audioState.speak_responses}
-              onChange={(e) => toggleSpeakResponses(e.target.checked)}
-            />
-            <span>Speak responses</span>
-          </label>
-        </div>
-        <div>
-          <strong>LLM server:</strong>{" "}
-          {health ? (health.llm_server_running ? "Running" : "Stopped") : "..."}
-        </div>
-        {"busy" in (health || {}) && (
-          <div>
-            <strong>Status:</strong> {health.busy ? "Busy" : "Idle"}
-          </div>
-        )}
-        {health && (
-          <div>
-            <strong>Chats:</strong> {chats.length}
-          </div>
-        )}
+      <StatusBar
+        health={health}
+        chatsCount={chats.length}
+        audioState={audioState}
+        loading={loading}
+        onStartServer={startServer}
+        onStopServer={stopServer}
+        onToggleSpeakResponses={toggleSpeakResponses}
+      />
 
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button onClick={startServer} disabled={loading || (health && health.llm_server_running)}>
-            Start server
-          </button>
-          <button onClick={stopServer} disabled={loading || (health && !health.llm_server_running)}>
-            Stop server
-          </button>
-        </div>
-      </div>
+      {err && <div className={styles.errorBanner}>{err}</div>}
 
-      {err && <div style={{ color: "crimson", marginBottom: 12 }}>{err}</div>}
-      
-      { /* Sidebar & chat panels */ }
-      <div style={{ 
-        display: "flex",
-        gap: 12
-      }}>
-        { /* Sidebar */ }
-        <aside
-          style={{
-            width: 280,
-            border: "4px solid #474747",
-            borderRadius: 8,
-            padding: 12,
-            height: 620,
-            overflowY: "auto"
+      <div className={styles.layout}>
+        <ChatSidebar
+          chats={filteredChats}
+          activeChatId={activeChatId}
+          chatFilter={chatFilter}
+          loading={loading}
+          onSelectChat={async (id) => {
+            setErr("");
+            setActiveChatId(id);
+            try { await loadSingleChat(id); }
+            catch { setErr("Failed to load selected chat."); }
           }}
-        >
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={createNewChat} disabled={loading} style={{ flex: 1 }}>
-              + New chat
-            </button>
-            <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={loading}
-              >
-                Import
-              </button>
+          onFilterChange={setChatFilter}
+          onNewChat={createNewChat}
+          onImport={importChat}
+          onRename={renameChat}
+          onDelete={deleteChat}
+          onExport={(id) => { window.location.href = `/api/chats/${id}/export`; }}
+        />
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                style={{ display: "none" }}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = ""; // allow importing same file twice
-                  if (f) importChat(f);
-                }}
-              />
-          </div>
-
-          <input
-            value={chatFilter}
-              onChange={(e) => setChatFilter(e.target.value)}
-              placeholder="Search chats..."
-              style={{ width: "100%", padding: 8, borderRadius: 8, border: "2px solid #474747", marginBottom: 10 }}
-          />
-
-          {filteredChats.map((c) => {
-            const isActive = c.id === activeChatId;
-            return (
-              <div
-                key={c.id}
-                onClick={async () => {
-                  setErr("");
-                  setActiveChatId(c.id);
-                  try {
-                    await loadSingleChat(c.id);
-                  } catch {
-                    setErr("Failed to load selected chat.");
-                  }
-                }}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  padding: 10,
-                  marginBottom: 8,
-                  borderRadius: 8,
-                  border: isActive ? "4px solid #00ffff" : "2px solid #474747",
-                  background: isActive ? "#111" : "transparent",
-                  color: "inherit",
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ fontWeight: 700, marginBottom: 4 }}>{formatChatTitle(c)}</div>
-                <div style={{ fontSize: 12, opacity: 0.75 }}>{c.updated_at}</div>
-                {isActive && (
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation(); // prevent selecting chat again
-                        renameChat(c.id);
-                      }}
-                      style={{ padding: "6px 10px" }}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteChat(c.id);
-                      }}
-                      style={{ padding: "6px 10px" }}
-                    >
-                      Delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (!activeChatId) return;
-                        window.location.href = `/api/chats/${activeChatId}/export`;
-                      }}
-                      style={{ padding: "6px 10px" }}
-                    >
-                      Export
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </aside>
-
-        {/* Chat panel */}
-        <section style={{ flex: 1 }}>
-          <div
-            style={{
-              border: "4px solid #474747",
-              borderRadius: 8,
-              padding: 12,
-              minHeight: 320,
-              maxHeight: 520,
-              overflowY: "auto",
-              marginBottom: 12,
-            }}
-          >
-            {messages.map((m, i) => (
-              <div key={i} style={{ marginBottom: 12 }}>
-                <div style={{ fontWeight: 700, textTransform: "capitalize" }}>{m.role}</div>
-                <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
-              </div>
-            ))}
-            {loading && (
-              <div>
-                <em>Thinking…</em>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={send} style={{ display: "flex", gap: 8 }}>
-                <input
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Type a message..."
-                  style={{ flex: 1, padding: 10, borderRadius: 8, border: "4px solid #00ffff" }}
-                  disabled={!activeChatId}
-                />
-                <button
-                  disabled={loading || !activeChatId || (health && !health.llm_server_running)}
-                  style={{ border: "4px solid #00ffff", borderRadius: 8, padding: "10px 14px" }}
-                >
-                  Send
-                </button>
-                <button
-                  type="button"
-                  onClick={clearActiveChat}
-                  disabled={loading || !activeChatId}
-                  style={{ border: "4px solid #00ffff", borderRadius: 8, padding: "10px 14px" }}
-                >
-                  Clear
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleRecording}
-                  disabled={loading || (health && !health.llm_server_running)}
-                  style={{ border: "4px solid #00ffff", borderRadius: 8, padding: "10px 14px" }}
-                >
-                  {audioState.recording ? "Stop Mic" : "Mic"}
-                </button>
-              </form>
-            </section>
-          </div>
+        <ChatPanel
+          messages={messages}
+          prompt={prompt}
+          loading={loading}
+          activeChatId={activeChatId}
+          health={health}
+          audioState={audioState}
+          onPromptChange={setPrompt}
+          onSend={send}
+          onClear={clearActiveChat}
+          onToggleRecording={toggleRecording}
+        />
+      </div>
     </main>
   );
 }
